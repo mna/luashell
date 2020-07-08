@@ -30,6 +30,7 @@
 --   sh.test[[-f /path/to/file]]
 --]]
 
+--local inspect = require 'inspect'
 local posix = require 'posix'
 local unistd = require 'posix.unistd'
 
@@ -162,29 +163,40 @@ local function pipe_to_tasks(pipe, ...)
   return tasks
 end
 
-local function consume_pfd_output(pfd)
+local function consume_pfd_output(pfd, drop)
   local out = {}
   local s, err
   while true do
     -- do not use assert here, the pipe needs to be closed
     s, err = unistd.read(pfd.fd, Shell.OUTPUT_BLOCK_SIZE)
-    if not s then break end
-    table.insert(out, s)
+    if not s or s == '' then break end
+    if not drop then table.insert(out, s) end
   end
 
   -- do not use assert here, to prevent hiding an error with read
-  local pid, status, code = posix.pclose(pfd)
+  -- NOTE: documentation for luaposix is wrong here, pclose returns
+  -- the status (reason) and code.
+  local status, code = posix.pclose(pfd)
   -- first, assert on a possible read error
-  -- TODO: handle EOF!
   assert(s, err)
   -- now we can assert on the result of pclose
-  assert(pid, status)
-  return table.concat(out), status, code
+  assert(status, code)
+
+  -- if there is no output and it exited with an error, return
+  -- nil as output so that it can be combined with assert().
+  local res = table.concat(out)
+  if res == '' and (status ~= 'exited' or code > 0) then
+    res = nil
+  end
+  return res, status, code
 end
 
 function Cmd:exec(...)
   local task = cmd_to_task(self, ...)
-  local _, status, code = assert(posix.spawn(task))
+  -- NOTE: documentation for luaposix is wrong here, it doesn't return the same
+  -- values as wait, it returns the status code and the status string, and code
+  -- is nil if it failed.
+  local code, status = assert(posix.spawn(task))
   return (status == 'exited' and code == 0), status, code
 end
 
@@ -197,7 +209,7 @@ end
 function Pipe:exec(...)
   local tasks = pipe_to_tasks(self, ...)
   local pfd = posix.popen_pipeline(tasks, 'r')
-  local _, status, code = assert(posix.pclose(pfd))
+  local _, status, code = consume_pfd_output(pfd, true)
   return (status == 'exited' and code == 0), status, code
 end
 

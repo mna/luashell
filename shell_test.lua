@@ -1,6 +1,8 @@
 local lu = require 'luaunit'
 local sh = require 'shell'
 
+local NOSUCH = 'No-sUch_CommANd_ORVAr'
+
 TestType = {}
 function TestType.testNil()
   local got = sh.type(nil)
@@ -72,7 +74,7 @@ function TestVar.testExists()
 end
 
 function TestVar.testNotExists()
-  local got = sh.var('NO-SUCH_VARIABLE')
+  local got = sh.var(NOSUCH)
   lu.assertNil(got)
 end
 
@@ -82,7 +84,7 @@ function TestVar.testExistsTable()
 end
 
 function TestVar.testNotExistsTable()
-  local got = sh.var{'NO-SUCH_VARIABLE'}
+  local got = sh.var{NOSUCH}
   lu.assertNil(got)
 end
 
@@ -92,17 +94,17 @@ function TestVar.testExistsTableDefault()
 end
 
 function TestVar.testNotExistsTableDefault()
-  local got = sh.var{'NO-SUCH_VARIABLE', 'zzz'}
+  local got = sh.var{NOSUCH, 'zzz'}
   lu.assertEquals(got, 'zzz')
 end
 
 function TestVar.testNotExistsTableDefaultSkipNonString()
-  local got = sh.var{'NO-SUCH_VARIABLE', 3, false, 'zzz'}
+  local got = sh.var{NOSUCH, 3, false, 'zzz'}
   lu.assertEquals(got, 'zzz')
 end
 
 function TestVar.testComposition()
-  local got = sh.var{'NO-SUCH_VARIABLE', sh.var{'Still-NO-SUCH_VARIABLE', 'zzz'}}
+  local got = sh.var{NOSUCH, sh.var{'Still-' .. NOSUCH, 'zzz'}}
   lu.assertEquals(got, 'zzz')
 end
 
@@ -110,6 +112,198 @@ TestExec = {}
 function TestExec.testTrue()
   local got = sh.exec('true')
   lu.assertTrue(got)
+end
+
+function TestExec.testFalse()
+  local got = sh.exec('false')
+  lu.assertFalse(got)
+end
+
+function TestExec.testNotExists()
+  local got, status, code = sh.exec(NOSUCH)
+  lu.assertFalse(got)
+  lu.assertEquals(status, 'exited')
+  lu.assertTrue(code > 0)
+end
+
+function TestExec.testWithArgs()
+  local got, status, code = sh.exec('echo', 'allo')
+  lu.assertTrue(got)
+  lu.assertEquals(status, 'exited')
+  lu.assertEquals(code, 0)
+end
+
+function TestExec.testWithMetamethod()
+  local got, status, code = sh('echo', 'allo2')
+  lu.assertTrue(got)
+  lu.assertEquals(status, 'exited')
+  lu.assertEquals(code, 0)
+end
+
+function TestExec.testWithCmd()
+  local cmd = sh.cmd('true')
+  local got, status, code = sh.exec(cmd)
+  lu.assertTrue(got)
+  lu.assertEquals(status, 'exited')
+  lu.assertEquals(code, 0)
+end
+
+function TestExec.testWithPipe()
+  local p = sh.cmd('echo', 'allo3') | sh.cmd('head', '-c1')
+  local got, status, code = sh.exec(p)
+  lu.assertTrue(got)
+  lu.assertEquals(status, 'exited')
+  lu.assertEquals(code, 0)
+end
+
+function TestExec.testWithBadArgument()
+  lu.assertErrorMsgMatches('.-must be a string, a Cmd or a Pipe.*', function()
+    sh.exec(42)
+  end)
+end
+
+TestCmd = {}
+function TestCmd.testExec()
+  local cmd = sh.cmd('true')
+  local got, status, code = cmd:exec()
+  lu.assertTrue(got)
+  lu.assertEquals(status, 'exited')
+  lu.assertEquals(code, 0)
+end
+
+function TestCmd.testExecNotExists()
+  local cmd = sh.cmd(NOSUCH)
+  local got, status, code = cmd:exec()
+  lu.assertFalse(got)
+  lu.assertEquals(status, 'exited')
+  lu.assertTrue(code > 0)
+end
+
+function TestCmd.testOutput()
+  local cmd = sh.cmd('echo', '-n', 'allo4')
+  local out, status, code = cmd:output()
+  lu.assertEquals(out, 'allo4')
+  lu.assertEquals(status, 'exited')
+  lu.assertEquals(code, 0)
+end
+
+function TestCmd.testOutputNotExists()
+  local cmd = sh.cmd(NOSUCH)
+  local out, status, code = cmd:output()
+  lu.assertNil(out)
+  lu.assertEquals(status, 'exited')
+  lu.assertTrue(code > 0)
+end
+
+function TestCmd.testOutputAssertNotExists()
+  lu.assertErrorMsgMatches('.-exited.*', function()
+    local cmd = sh.cmd(NOSUCH)
+    assert(cmd:output())
+  end)
+end
+
+function TestCmd.testExecExtraArgs()
+  local cmd = sh.cmd('echo')
+  local got, status, code = cmd:exec('a', 'b')
+  lu.assertTrue(got)
+  lu.assertEquals(status, 'exited')
+  lu.assertEquals(code, 0)
+end
+
+function TestCmd.testOutputExtraArgs()
+  local cmd = sh.cmd('echo', '-n')
+  local out, status, code = cmd:output('a', 'b')
+  lu.assertEquals(out, 'a b')
+  lu.assertEquals(status, 'exited')
+  lu.assertEquals(code, 0)
+end
+
+TestPipe = {}
+function TestPipe.testExec()
+  local p = sh.cmd('echo', 'allo') | sh.cmd('wc', '-c')
+  local got, status, code = p:exec()
+  lu.assertTrue(got)
+  lu.assertEquals(status, 'exited')
+  lu.assertEquals(code, 0)
+end
+
+function TestPipe.xtestExecNotExistsLeft()
+  -- NOTE: does not seem possible in POSIX, set -o pipefail is bash
+  local p = sh.cmd(NOSUCH, 'allo') | sh.cmd('wc', '-c')
+  local got, status, code = p:exec()
+  lu.assertFalse(got)
+  lu.assertEquals(status, 'exited')
+  lu.assertTrue(code > 0)
+end
+
+function TestPipe.testExecNotExistsRight()
+  local p = sh.cmd('echo', 'allo') | sh.cmd(NOSUCH, '-c')
+  local got, status, code = p:exec()
+  lu.assertFalse(got)
+  lu.assertEquals(status, 'exited')
+  lu.assertTrue(code > 0)
+end
+
+function TestPipe.testOutput()
+  local p = sh.cmd('echo', '-n', 'allo') | sh.cmd('wc', '-c')
+  local out, status, code = p:output()
+  lu.assertEquals(out, '4\n')
+  lu.assertEquals(status, 'exited')
+  lu.assertEquals(code, 0)
+end
+
+function TestPipe.testOutputNotExistsRight()
+  local p = sh.cmd('echo', '-n', 'allo') | sh.cmd(NOSUCH)
+  local out, status, code = p:output()
+  lu.assertNil(out)
+  lu.assertEquals(status, 'exited')
+  lu.assertTrue(code > 0)
+end
+
+function TestPipe.testCombinePipeLeft()
+  local p = sh.cmd('echo', '-n', 'allo12345678') | sh.cmd('wc', '-c') | sh.cmd('cat')
+  local p2 = p | sh.cmd('wc', '-c')
+  local out, status, code = p2:output()
+  lu.assertEquals(out, '3\n')
+  lu.assertEquals(status, 'exited')
+  lu.assertEquals(code, 0)
+end
+
+function TestPipe.testCombineLeftInvalid()
+  lu.assertErrorMsgContains('left operand', function()
+    local _ = 3 | sh.cmd('true')
+  end)
+end
+
+function TestPipe.testCombinePipeRight()
+  local p = sh.cmd('wc', '-c') | sh.cmd('head', '-c1')
+  local p2 = sh.cmd('echo', '-n', 'allo') | p | sh.cmd('wc', '-c')
+  local out, status, code = p2:output()
+  lu.assertEquals(out, '1\n')
+  lu.assertEquals(status, 'exited')
+  lu.assertEquals(code, 0)
+end
+
+function TestPipe.testCombineRightInvalid()
+  lu.assertErrorMsgContains('right operand', function()
+    local _ = sh.cmd('true') | 3
+  end)
+end
+
+function TestPipe.testExecExtraArgs()
+  local p = sh.cmd('echo', '-n') | sh.cmd('wc', '-c')
+  local got, status, code = p:exec('allo')
+  lu.assertTrue(got)
+  lu.assertEquals(status, 'exited')
+  lu.assertEquals(code, 0)
+end
+
+function TestPipe.testOutputExtraArgs()
+  local p = sh.cmd('echo', '-n') | sh.cmd('wc', '-c')
+  local out, status, code = p:output('allo', 'you')
+  lu.assertEquals(out, '8\n')
+  lu.assertEquals(status, 'exited')
+  lu.assertEquals(code, 0)
 end
 
 os.exit(lu.LuaUnit.run())
