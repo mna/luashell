@@ -59,4 +59,57 @@ function TestType.testPipe()
   lu.assertEquals(got, 'Pipe')
 end
 
+TestVar = {}
+function TestVar.testBadArgument()
+  lu.assertErrorMsgMatches('.-must be a table or a string.*', function()
+    sh.var(4)
+  end)
+end
+
+function TestVar.testExists()
+  local got = sh.var('PATH')
+  lu.assertTrue(got ~= '')
+end
+
+function TestVar.testNotExists()
+  local got = sh.var('NO-SUCH_VARIABLE')
+  lu.assertNil(got)
+end
+
+function TestVar.testExistsTable()
+  local got = sh.var{'PATH'}
+  lu.assertTrue(got ~= '')
+end
+
+function TestVar.testNotExistsTable()
+  local got = sh.var{'NO-SUCH_VARIABLE'}
+  lu.assertNil(got)
+end
+
+function TestVar.testExistsTableDefault()
+  local got = sh.var{'PATH', 'zzz'}
+  lu.assertTrue(got ~= '' and got ~= 'zzz')
+end
+
+function TestVar.testNotExistsTableDefault()
+  local got = sh.var{'NO-SUCH_VARIABLE', 'zzz'}
+  lu.assertEquals(got, 'zzz')
+end
+
+function TestVar.testNotExistsTableDefaultSkipNonString()
+  local got = sh.var{'NO-SUCH_VARIABLE', 3, false, 'zzz'}
+  lu.assertEquals(got, 'zzz')
+end
+
+function TestVar.testComposition()
+  local got = sh.var{'NO-SUCH_VARIABLE', sh.var{'Still-NO-SUCH_VARIABLE', 'zzz'}}
+  lu.assertEquals(got, 'zzz')
+end
+
+TestExec = {}
+function TestExec.testTrue()
+  local got = sh.exec('true')
+  lu.assertTrue(got)
+end
+
 os.exit(lu.LuaUnit.run())

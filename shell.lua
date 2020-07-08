@@ -121,7 +121,7 @@ function Shell.var(t)
     local v = t[i]
     if type(v) == 'string' then
       if i == 1 then v = os.getenv(v) end
-      if v ~= '' then return v end
+      if v and v ~= '' then return v end
     end
   end
 end
