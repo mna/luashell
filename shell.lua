@@ -21,19 +21,19 @@
 -- Or equivalently:
 --   sh(sh.cmd('echo', 'allo') | sh.cmd('wc', '-c'))
 --
--- To capture the stdout or the stderr of a command, call its
--- output method:
---   local out, exit = sh.cmd('echo', 'allo'):output()
+-- To capture the stdout of a command, call its output method:
+--   local out, status, exit = sh.cmd('echo', 'allo'):output()
 -- Works on pipelines too:
---   local out, exit = (sh.cmd('echo', 'allo') | sh.cmd('wc', '-c')):output()
+--   local out, status, exit = (sh.cmd('echo', 'allo') | sh.cmd('wc', '-c')):output()
 --
 -- POSIX tests are just a wrapper around sh.exec:
 --   sh.test[[-f /path/to/file]]
 --]]
 
 local posix = require 'posix'
+local unistd = require 'posix.unistd'
 
-local Shell, Cmd, Pipe = {}, {_name = 'Cmd'}, {_name = 'Pipe'}
+local Shell, Cmd, Pipe = {OUTPUT_BLOCK_SIZE = 1024}, {_name = 'Cmd'}, {_name = 'Pipe'}
 
 -- Constructor function for new Cmd or Pipe instances.
 local function newobj(class, o)
@@ -146,36 +146,65 @@ local function cmd_to_task(cmd, ...)
   return task
 end
 
+local function pipe_to_tasks(pipe, ...)
+  assert(#pipe > 0, 'empty Pipe')
+
+  local tasks = {}
+  for i = 1, #pipe do
+    local t
+    if i == 1 then
+      t = cmd_to_task(pipe[i], ...)
+    else
+      t = cmd_to_task(pipe[i])
+    end
+    table.insert(tasks, t)
+  end
+  return tasks
+end
+
+local function consume_pfd_output(pfd)
+  local out = {}
+  local s, err
+  while true do
+    -- do not use assert here, the pipe needs to be closed
+    s, err = unistd.read(pfd.fd, Shell.OUTPUT_BLOCK_SIZE)
+    if not s then break end
+    table.insert(out, s)
+  end
+
+  -- do not use assert here, to prevent hiding an error with read
+  local pid, status, code = posix.pclose(pfd)
+  -- first, assert on a possible read error
+  -- TODO: handle EOF!
+  assert(s, err)
+  -- now we can assert on the result of pclose
+  assert(pid, status)
+  return table.concat(out), status, code
+end
+
 function Cmd:exec(...)
-  local _, status, code = assert(posix.spawn(cmd_to_task(self, ...)))
+  local task = cmd_to_task(self, ...)
+  local _, status, code = assert(posix.spawn(task))
   return (status == 'exited' and code == 0), status, code
 end
 
 function Cmd:output(...)
-
+  local task = cmd_to_task(self, ...)
+  local pfd = posix.popen(task, 'r')
+  return consume_pfd_output(pfd)
 end
 
 function Pipe:exec(...)
-  assert(#self > 0, 'empty Pipe')
-
-  local tasks = {}
-  for i = 1, #self do
-    local t
-    if i == 1 then
-      t = cmd_to_task(self[i], ...)
-    else
-      t = cmd_to_task(self[i])
-    end
-    table.insert(tasks, t)
-  end
-
+  local tasks = pipe_to_tasks(self, ...)
   local pfd = posix.popen_pipeline(tasks, 'r')
   local _, status, code = assert(posix.pclose(pfd))
   return (status == 'exited' and code == 0), status, code
 end
 
 function Pipe:output(...)
-
+  local tasks = pipe_to_tasks(self, ...)
+  local pfd = posix.popen_pipeline(tasks, 'r')
+  return consume_pfd_output(pfd)
 end
 
 return Shell
