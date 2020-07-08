@@ -1,0 +1,11 @@
+image: alpine/latest
+sources:
+  - git@git.sr.ht:~mna/luashell
+tasks:
+  - build: |
+      cd luashell
+      git remote add mirror git@github.com:mna/luashell.git
+      git push mirror master --tag
+secrets:
+  - 8a632639-cb32-49f8-b6b8-8040972f80a7
+  - fbb26d7f-ea1b-41c0-97b3-882ad37c66a0
