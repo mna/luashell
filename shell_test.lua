@@ -63,7 +63,7 @@ end
 
 TestVar = {}
 function TestVar.testBadArgument()
-  lu.assertErrorMsgMatches('.-must be a table or a string.*', function()
+  lu.assertErrorMsgContains('must be a table or a string', function()
     sh.var(4)
   end)
 end
@@ -157,7 +157,7 @@ function TestExec.testWithPipe()
 end
 
 function TestExec.testWithBadArgument()
-  lu.assertErrorMsgMatches('.-must be a string, a Cmd or a Pipe.*', function()
+  lu.assertErrorMsgContains('must be a string, a Cmd or a Pipe', function()
     sh.exec(42)
   end)
 end
@@ -196,7 +196,7 @@ function TestCmd.testOutputNotExists()
 end
 
 function TestCmd.testOutputAssertNotExists()
-  lu.assertErrorMsgMatches('.-exited.*', function()
+  lu.assertErrorMsgContains('exited', function()
     local cmd = sh.cmd(NOSUCH)
     assert(cmd:output())
   end)
@@ -304,6 +304,20 @@ function TestPipe.testOutputExtraArgs()
   lu.assertEquals(out, '8\n')
   lu.assertEquals(status, 'exited')
   lu.assertEquals(code, 0)
+end
+
+TestTest = {}
+function TestTest.testFileExists()
+  local got, status, code = sh.test[[-f shell_test.lua]]
+  lu.assertTrue(got)
+  lu.assertEquals(status, 'exited')
+  lu.assertEquals(code, 0)
+end
+
+function TestTest.testBadArgument()
+  lu.assertErrorMsgContains('must be a string', function()
+    sh.test(9)
+  end)
 end
 
 os.exit(lu.LuaUnit.run())

@@ -1,36 +1,3 @@
---[[
--- local sh = require 'luashell'
---
--- Get the value of an exported environment variable:
---   sh.v('name') or sh.v'name'
--- Use a default value if variable is unset or empty:
---   sh.v({'name', 'defaultval'}) or sh.v{'name', 'value'}
--- Also, this can compose well:
---   sh.v{'name', sh.v{'other', 'value'}}
---
--- Execute a command, returns true on success, false otherwise and
--- the command's status and exit code as 2nd and 3rd values:
---   sh('cmd') or sh.exec('cmd') or sh'cmd'
---
--- This is just a wrapper over creating a command and exec'ing it:
---   sh.cmd('cmd'[, args]):exec([args])
---
--- Piping commands is supported and returns a new command, that can
--- be executed:
---   local pipe = sh.cmd('echo', 'allo') | sh.cmd('wc', '-c'); pipe:exec()
--- Or equivalently:
---   sh(sh.cmd('echo', 'allo') | sh.cmd('wc', '-c'))
---
--- To capture the stdout of a command, call its output method:
---   local out, status, exit = sh.cmd('echo', 'allo'):output()
--- Works on pipelines too:
---   local out, status, exit = (sh.cmd('echo', 'allo') | sh.cmd('wc', '-c')):output()
---
--- POSIX tests are just a wrapper around sh.exec:
---   sh.test[[-f /path/to/file]]
---]]
-
---local inspect = require 'inspect'
 local posix = require 'posix'
 local unistd = require 'posix.unistd'
 
@@ -127,15 +94,27 @@ function Shell.var(t)
   end
 end
 
+-- Create a Cmd instance using the provided arguments. The first
+-- argument is the command name and the rest are the arguments bound
+-- to that Cmd.
 function Shell.cmd(...)
   assert(select('#', ...) > 0, 'at least one argument required')
   assert(type(select(1, ...)) == 'string', 'argument 1 must be a string')
   return newobj(Cmd, table.pack(...))
 end
 
+-- Execute a test with the specified condition. This is a shortcut
+-- for Shell.cmd('test', ...):exec() and only works for cases where
+-- no quoting is required, as it simply splits the condition on
+-- whitespace to extract the list of arguments. For more complex
+-- cases, using the cmd is required.
 function Shell.test(cond)
   assert(type(cond) == 'string', 'argument 1 must be a string')
-  return Shell.exec('test ' .. cond)
+  local args = {}
+  for w in string.gmatch(cond, '%S+') do
+    table.insert(args, w)
+  end
+  return Shell.exec('test', table.unpack(args))
 end
 
 local function cmd_to_task(cmd, ...)
@@ -191,6 +170,11 @@ local function consume_pfd_output(pfd, drop)
   return res, status, code
 end
 
+-- Execute the Cmd with optional additional arguments. Returns a boolean
+-- indicating success (exit code 0), and the status string and code. The
+-- status string is the same as the one in luaposix, that is:
+-- "exited", "killed" or "stopped". The code is the exit code or the signal
+-- number responsible for "killed" or "stopped".
 function Cmd:exec(...)
   local task = cmd_to_task(self, ...)
   -- NOTE: documentation for luaposix is wrong here, it doesn't return the same
@@ -200,12 +184,25 @@ function Cmd:exec(...)
   return (status == 'exited' and code == 0), status, code
 end
 
+-- This is the same as Cmd:exec except that it returns the stdout output as a string
+-- instead of the true/false boolean. The rest of the returned values are the same.
+-- If the command failed and no output was generated on stdout, it returns nil as output,
+-- so that it can be used in an assert call.
 function Cmd:output(...)
   local task = cmd_to_task(self, ...)
   local pfd = posix.popen(task, 'r')
   return consume_pfd_output(pfd)
 end
 
+-- Execute the Pipe with optional additional arguments to be provided to the
+-- first command of the pipeline. Returns a boolean
+-- indicating success (exit code 0), and the status string and code. The
+-- status string is the same as the one in luaposix, that is:
+-- "exited", "killed" or "stopped". The code is the exit code or the signal
+-- number responsible for "killed" or "stopped".
+--
+-- Note that the pipeline succeeds unless the final command fails (that is, there
+-- is no "set -o pipefail" mode, this is a bash-specific feature).
 function Pipe:exec(...)
   local tasks = pipe_to_tasks(self, ...)
   local pfd = posix.popen_pipeline(tasks, 'r')
@@ -213,6 +210,10 @@ function Pipe:exec(...)
   return (status == 'exited' and code == 0), status, code
 end
 
+-- This is the same as Pipe:exec except that it returns the stdout output as a string
+-- instead of the true/false boolean. The rest of the returned values are the same.
+-- If the pipe failed and no output was generated on stdout, it returns nil as output,
+-- so that it can be used in an assert call.
 function Pipe:output(...)
   local tasks = pipe_to_tasks(self, ...)
   local pfd = posix.popen_pipeline(tasks, 'r')
