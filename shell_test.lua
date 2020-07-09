@@ -226,6 +226,19 @@ function TestCmd.testDelayedOutput()
   lu.assertEquals(code, 0)
 end
 
+function TestCmd.testLongOutput()
+  local cmd = sh.cmd('cat', './shell_test.lua')
+  local out, status, code = cmd:output()
+  lu.assertEquals(status, 'exited')
+  lu.assertEquals(code, 0)
+
+  -- use diff to check if output is the same
+  local tmpnm = os.tmpname()
+  local tmpf = io.open(tmpnm, "w+"); tmpf:write(out); tmpf:close()
+  lu.assertTrue(sh('diff', './shell_test.lua', tmpnm), tmpnm)
+  os.remove(tmpnm)
+end
+
 TestPipe = {}
 function TestPipe.testExec()
   local p = sh.cmd('echo', 'allo') | sh.cmd('wc', '-c')
