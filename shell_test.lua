@@ -218,6 +218,14 @@ function TestCmd.testOutputExtraArgs()
   lu.assertEquals(code, 0)
 end
 
+function TestCmd.testDelayedOutput()
+  local cmd = sh.cmd('./testdelayecho.sh', '3', 'allo')
+  local out, status, code = cmd:output()
+  lu.assertEquals(out, 'allo')
+  lu.assertEquals(status, 'exited')
+  lu.assertEquals(code, 0)
+end
+
 TestPipe = {}
 function TestPipe.testExec()
   local p = sh.cmd('echo', 'allo') | sh.cmd('wc', '-c')
@@ -248,6 +256,22 @@ function TestPipe.testOutput()
   local p = sh.cmd('echo', '-n', 'allo') | sh.cmd('wc', '-c')
   local out, status, code = p:output()
   lu.assertEquals(out, '4\n')
+  lu.assertEquals(status, 'exited')
+  lu.assertEquals(code, 0)
+end
+
+function TestPipe.testOutputDelayedLeft()
+  local p = sh.cmd('./testdelayecho.sh', 2, 'allo') | sh.cmd('wc', '-c')
+  local out, status, code = p:output()
+  lu.assertEquals(out, '4\n')
+  lu.assertEquals(status, 'exited')
+  lu.assertEquals(code, 0)
+end
+
+function TestPipe.testOutputDelayedRight()
+  local p = sh.cmd('echo', '-n', 'allo2') | sh.cmd('./testdelayecho.sh')
+  local out, status, code = p:output()
+  lu.assertEquals(out, 'allo2')
   lu.assertEquals(status, 'exited')
   lu.assertEquals(code, 0)
 end
