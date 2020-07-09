@@ -239,6 +239,20 @@ function TestCmd.testLongOutput()
   os.remove(tmpnm)
 end
 
+function TestCmd.testReuseCmd()
+  local cmd = sh.cmd('echo', '-n', 'abcd')
+
+  local got = cmd:exec()
+  lu.assertTrue(got)
+
+  local out = cmd:output('efgh')
+  lu.assertEquals(out, 'abcd efgh')
+
+  local p = cmd | sh.cmd('wc', '-c')
+  out = p:output()
+  lu.assertEquals(out, '4\n') -- cmd runs with 'abcd' only
+end
+
 TestPipe = {}
 function TestPipe.testExec()
   local p = sh.cmd('echo', 'allo') | sh.cmd('wc', '-c')
