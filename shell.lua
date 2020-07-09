@@ -54,17 +54,16 @@ setmetatable(Shell, {_name = 'Shell', __call = __call})
 -- or a Pipe. Extra arguments are passed to the execution of
 -- the command (or pipe).
 function Shell.exec(...)
-  -- TODO: is it better with select?
-  local args = table.pack(...)
-  if args.n == 0 then return end
+  local n = select('#', ...)
+  if n == 0 then return end
 
-  local typ = Shell.type(args[1])
+  local first = select(1, ...)
+  local typ = Shell.type(first)
   if typ == 'string' then
     local cmd = Shell.cmd(...)
     return cmd:exec()
   elseif typ == 'Cmd' or typ == 'Pipe' then
-    local x = args[1]
-    return x:exec(table.unpack(args, 2, args.n))
+    return first:exec(select(2, ...))
   else
     error('argument 1 must be a string, a Cmd or a Pipe')
   end
@@ -119,9 +118,9 @@ end
 
 local function cmd_to_task(cmd, ...)
   local task = {table.unpack(cmd, 1, cmd.n)}
-  local args = table.pack(...)
-  for i = 1, args.n do
-    table.insert(task, args[i])
+  local n = select('#', ...)
+  for i = 1, n do
+    table.insert(task, (select(i, ...)))
   end
   return task
 end

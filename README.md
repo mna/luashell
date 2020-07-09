@@ -93,10 +93,11 @@ so that it can be used in an `assert` call.
 
 Clone the project and install the required development dependencies:
 
-* luaposix (actual run-time dependency)
+* luaposix (the only run-time dependency)
 * luaunit (unit test runner)
 * luacov (recommended, test coverage)
 * inspect (recommended for debugging, pretty-printing of values)
+* luabenchmark (to run benchmarks)
 
 If like me you prefer to keep your dependencies locally, per-project, then I recommend using my [llrocks] wrapper of the `luarocks` cli, which by default uses a local `lua_modules/` tree.
 
@@ -104,10 +105,11 @@ If like me you prefer to keep your dependencies locally, per-project, then I rec
 $ llrocks install ...
 ```
 
-To run tests:
+To run tests and benchmarks:
 
 ```
 $ llrocks run shell_test.lua
+$ llrocks run shell_bench.lua
 ```
 
 To view code coverage:
