@@ -141,28 +141,66 @@ local function pipe_to_tasks(pipe, ...)
   return tasks
 end
 
-local function consume_pfd_output(pfd, drop)
-  local out = {}
-  local s, err
-  while true do
-    -- do not use assert here, the pipe needs to be closed
-    s, err = unistd.read(pfd.fd, Shell.OUTPUT_BLOCK_SIZE)
-    if not s or s == '' then break end
-    if not drop then table.insert(out, s) end
-  end
+local function consume_pfd_output(pfd, target, mode)
+  -- target can be:
+  -- * true: means to ignore the output (drop it)
+  -- * string: filename to save output to
+  -- * number: file descriptor to write output to
+  -- * file: file handle to write output to
+  -- * function: function to receive output chunks
+  -- * falsy: collect output and return as string
+
+  local out
+  local ttyp = io.type(target) or type(target)
+
+  local ok, err = pcall(function()
+    if not target then
+      out = {}
+    elseif ttyp == 'string' then
+      out = assert(io.open(target, mode))
+    end
+
+    while true do
+      local s = assert(unistd.read(pfd.fd, Shell.OUTPUT_BLOCK_SIZE))
+      if s == '' then break end
+
+      if not target then
+        table.insert(out, s)
+      elseif ttyp == 'string' then
+        assert(out:write(s))
+      elseif ttyp == 'number' then
+        local n = assert(unistd.write(target, s))
+        assert(n == #s, 'short write')
+      elseif ttyp == 'file' then
+        assert(target:write(s))
+      elseif ttyp == 'function' then
+        target(s)
+      end
+    end
+
+    -- extra call to the function with nil as argument to signal end of output
+    if ttyp == 'function' then
+      target()
+    end
+  end)
+
+  -- if we opened a file, close it
+  if ttyp == 'string' then out:close() end
 
   -- do not use assert here, to prevent hiding an error with read
   -- NOTE: documentation for luaposix is wrong here, pclose returns
   -- the status (reason) and code.
   local status, code = posix.pclose(pfd)
-  -- first, assert on a possible read error
-  assert(s, err)
+
+  -- first, assert on a possible error while processing output
+  assert(ok, err)
   -- now we can assert on the result of pclose
   assert(status, code)
 
   -- if there is no output and it exited with an error, return
   -- nil as output so that it can be combined with assert().
-  local res = table.concat(out)
+  local res = ''
+  if not target then res = table.concat(out) end
   if res == '' and (status ~= 'exited' or code > 0) then
     res = nil
   end
@@ -193,6 +231,32 @@ function Cmd:output(...)
   return consume_pfd_output(pfd)
 end
 
+-- This is similar to Cmd:exec and Cmd:output, but it redirects the stdout output
+-- of the command to the specified target. The target can be:
+--
+-- * a string, in which case this is a filename that will be open in append (default)
+--   or truncate (if truncate is true) mode and will be closed on return.
+-- * a file handle (io.type(target) == 'file'), in which case the truncate argument is
+--   ignored and the output will be written to that file handle. It is not closed on
+--   return, as the function did not open it.
+-- * a number, in which case this is a file descriptor to which the output will be
+--   written, and in which case the truncate argument is ignored. It is not closed on
+--   return, as the function did not open it.
+-- * a function, in which case it will be called with one argument, a string with each chunk
+--   of bytes from the output. It will be called a final time with nil to indicate the last
+--   call. The truncate argument is ignored in that case too.
+--
+-- The rest of the arguments are extra arguments for the command, as for Cmd:exec and
+-- Cmd:output. It returns true or false as first argument, then the
+-- status and exit code, like Cmd:exec.
+function Cmd:redirect(target, truncate, ...)
+  local task = cmd_to_task(self, ...)
+  local pfd = posix.popen(task, 'r')
+  local mode = truncate and 'w+' or 'a+'
+  local _, status, code = consume_pfd_output(pfd, target, mode)
+  return (status == 'exited' and code == 0), status, code
+end
+
 -- Execute the Pipe with optional additional arguments to be provided to the
 -- first command of the pipeline. Returns a boolean
 -- indicating success (exit code 0), and the status string and code. The
@@ -217,6 +281,32 @@ function Pipe:output(...)
   local tasks = pipe_to_tasks(self, ...)
   local pfd = posix.popen_pipeline(tasks, 'r')
   return consume_pfd_output(pfd)
+end
+
+-- This is similar to Pipe:exec and Pipe:output, but it redirects the stdout output
+-- of the pipeline to the specified target. The target can be:
+--
+-- * a string, in which case this is a filename that will be open in append (default)
+--   or truncate (if truncate is true) mode and will be closed on return.
+-- * a file handle (io.type(target) == 'file'), in which case the truncate argument is
+--   ignored and the output will be written to that file handle. It is not closed on
+--   return, as the function did not open it.
+-- * a number, in which case this is a file descriptor to which the output will be
+--   written, and in which case the truncate argument is ignored. It is not closed on
+--   return, as the function did not open it.
+-- * a function, in which case it will be called with one argument, a string with each chunk
+--   of bytes from the output. It will be called a final time with nil to indicate the last
+--   call. The truncate argument is ignored in that case too.
+--
+-- The rest of the arguments are extra arguments for the pipeline, as for Pipe:exec and
+-- Pipe:output. It returns true or false as first argument, then the
+-- status and exit code, like Pipe:exec.
+function Pipe:redirect(target, truncate, ...)
+  local tasks = pipe_to_tasks(self, ...)
+  local pfd = posix.popen_pipeline(tasks, 'r')
+  local mode = truncate and 'w+' or 'a+'
+  local _, status, code = consume_pfd_output(pfd, target, mode)
+  return (status == 'exited' and code == 0), status, code
 end
 
 return Shell

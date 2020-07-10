@@ -65,6 +65,27 @@ instead of the true/false boolean. The rest of the returned values are the same.
 If the command failed and no output was generated on stdout, it returns nil as output,
 so that it can be used in an `assert` call.
 
+### Cmd:redirect(target, truncate, ...)
+
+This is similar to `Cmd:exec` and `Cmd:output`, but it redirects the stdout output
+of the command to the specified target. The target can be:
+
+* a string, in which case this is a filename that will be open in append (default)
+  or truncate (if truncate is true) mode and will be closed on return.
+* a file handle (`io.type(target) == 'file'`), in which case the truncate argument is
+  ignored and the output will be written to that file handle. It is not closed on
+  return, as the function did not open it.
+* a number, in which case this is a file descriptor to which the output will be
+  written, and in which case the truncate argument is ignored. It is not closed on
+  return, as the function did not open it.
+* a function, in which case it will be called with one argument, a string with each chunk
+  of bytes from the output. It will be called a final time with nil to indicate the last
+  call. The truncate argument is ignored in that case too.
+
+The rest of the arguments are extra arguments for the command, as for `Cmd:exec` and
+`Cmd:output`. It returns true or false as first argument, then the
+status and exit code, like `Cmd:exec`.
+
 ### Pipe '|' operator
 
 Applying the pipe '|' operator to 'Cmd' or 'Pipe' (or a combination of those)
@@ -88,6 +109,27 @@ This is the same as `Pipe:exec` except that it returns the stdout output as a st
 instead of the true/false boolean. The rest of the returned values are the same.
 If the pipe failed and no output was generated on stdout, it returns nil as output,
 so that it can be used in an `assert` call.
+
+### Pipe:redirect(target, truncate, ...)
+
+This is similar to `Pipe:exec` and `Pipe:output`, but it redirects the stdout output
+of the pipeline to the specified target. The target can be:
+
+* a string, in which case this is a filename that will be open in append (default)
+  or truncate (if truncate is true) mode and will be closed on return.
+* a file handle (`io.type(target) == 'file'`), in which case the truncate argument is
+  ignored and the output will be written to that file handle. It is not closed on
+  return, as the function did not open it.
+* a number, in which case this is a file descriptor to which the output will be
+  written, and in which case the truncate argument is ignored. It is not closed on
+  return, as the function did not open it.
+* a function, in which case it will be called with one argument, a string with each chunk
+  of bytes from the output. It will be called a final time with nil to indicate the last
+  call. The truncate argument is ignored in that case too.
+
+The rest of the arguments are extra arguments for the pipeline, as for `Pipe:exec` and
+`Pipe:output`. It returns true or false as first argument, then the
+status and exit code, like `Pipe:exec`.
 
 ## Development
 

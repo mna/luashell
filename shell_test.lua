@@ -1,5 +1,7 @@
 local lu = require 'luaunit'
+local posix = require 'posix'
 local sh = require 'shell'
+local unistd = require 'posix.unistd'
 
 local NOSUCH = 'No-sUch_CommANd_ORVAr'
 
@@ -253,6 +255,74 @@ function TestCmd.testReuseCmd()
   lu.assertEquals(out, '4\n') -- cmd runs with 'abcd' only
 end
 
+function TestCmd.testRedirectFunction()
+  local cmd = sh.cmd('echo', '-n', 'allo')
+  local out = {}
+  local got, status, code = cmd:redirect(function(s)
+    if not s then return end
+    table.insert(out, s)
+  end)
+
+  lu.assertTrue(got)
+  lu.assertEquals(status, 'exited')
+  lu.assertEquals(code, 0)
+  lu.assertEquals(table.concat(out), 'allo')
+end
+
+function TestCmd.testRedirectFilename()
+  local cmd = sh.cmd('echo', '-n', 'allo')
+  local name = os.tmpname()
+  local got, status, code = cmd:redirect(name)
+
+  local fh = io.open(name)
+  local out = fh:read('a')
+  fh:close()
+  os.remove(name)
+
+  lu.assertTrue(got)
+  lu.assertEquals(status, 'exited')
+  lu.assertEquals(code, 0)
+  lu.assertEquals(out, 'allo')
+end
+
+function TestCmd.testRedirectFile()
+  local cmd = sh.cmd('echo', '-n', 'allo')
+  local name = os.tmpname()
+  local fh = io.open(name, 'w')
+
+  local got, status, code = cmd:redirect(fh)
+  lu.assertEquals(io.type(fh), 'file') -- not closed
+
+  fh:close()
+  fh = io.open(name, 'r')
+  local out = fh:read('a')
+  fh:close()
+  os.remove(name)
+
+  lu.assertTrue(got)
+  lu.assertEquals(status, 'exited')
+  lu.assertEquals(code, 0)
+  lu.assertEquals(out, 'allo')
+end
+
+function TestCmd.testRedirectFd()
+  local cmd = sh.cmd('echo', '-n', 'allo')
+  local name = os.tmpname()
+  local fd = assert(posix.open(name, posix.O_CREAT | posix.O_RDWR, 'rw-r-----'))
+
+  local got, status, code = cmd:redirect(fd)
+
+  assert(unistd.lseek(fd, 0, unistd.SEEK_SET))
+  local out = assert(unistd.read(fd, 1024))
+  assert(unistd.close(fd))
+  os.remove(name)
+
+  lu.assertTrue(got)
+  lu.assertEquals(status, 'exited')
+  lu.assertEquals(code, 0)
+  lu.assertEquals(out, 'allo')
+end
+
 TestPipe = {}
 function TestPipe.testExec()
   local p = sh.cmd('echo', 'allo') | sh.cmd('wc', '-c')
@@ -355,6 +425,74 @@ function TestPipe.testOutputExtraArgs()
   lu.assertEquals(out, '8\n')
   lu.assertEquals(status, 'exited')
   lu.assertEquals(code, 0)
+end
+
+function TestPipe.testRedirectFunction()
+  local p = sh.cmd('echo', '-n', 'allo') | sh.cmd('wc', '-c')
+  local out = {}
+  local got, status, code = p:redirect(function(s)
+    if not s then return end
+    table.insert(out, s)
+  end)
+
+  lu.assertTrue(got)
+  lu.assertEquals(status, 'exited')
+  lu.assertEquals(code, 0)
+  lu.assertEquals(table.concat(out), '4\n')
+end
+
+function TestPipe.testRedirectFilename()
+  local p = sh.cmd('echo', '-n', 'allo') | sh.cmd('wc', '-c')
+  local name = os.tmpname()
+  local got, status, code = p:redirect(name)
+
+  local fh = io.open(name)
+  local out = fh:read('a')
+  fh:close()
+  os.remove(name)
+
+  lu.assertTrue(got)
+  lu.assertEquals(status, 'exited')
+  lu.assertEquals(code, 0)
+  lu.assertEquals(out, '4\n')
+end
+
+function TestPipe.testRedirectFile()
+  local p = sh.cmd('echo', '-n', 'allo') | sh.cmd('wc', '-c')
+  local name = os.tmpname()
+  local fh = io.open(name, 'w')
+
+  local got, status, code = p:redirect(fh)
+  lu.assertEquals(io.type(fh), 'file') -- not closed
+
+  fh:close()
+  fh = io.open(name, 'r')
+  local out = fh:read('a')
+  fh:close()
+  os.remove(name)
+
+  lu.assertTrue(got)
+  lu.assertEquals(status, 'exited')
+  lu.assertEquals(code, 0)
+  lu.assertEquals(out, '4\n')
+end
+
+function TestCmd.testRedirectFd()
+  local p = sh.cmd('echo', '-n', 'allo') | sh.cmd('wc', '-c')
+  local name = os.tmpname()
+  local fd = assert(posix.open(name, posix.O_CREAT | posix.O_RDWR, 'rw-r-----'))
+
+  local got, status, code = p:redirect(fd)
+
+  assert(unistd.lseek(fd, 0, unistd.SEEK_SET))
+  local out = assert(unistd.read(fd, 1024))
+  assert(unistd.close(fd))
+  os.remove(name)
+
+  lu.assertTrue(got)
+  lu.assertEquals(status, 'exited')
+  lu.assertEquals(code, 0)
+  lu.assertEquals(out, '4\n')
 end
 
 TestTest = {}
