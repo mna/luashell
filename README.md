@@ -50,6 +50,12 @@ no quoting is required, as it simply splits the condition on
 whitespace to extract the list of arguments. For more complex
 cases, using the 'Cmd' is required.
 
+### sh.glob(s)
+
+This is the same as the luaposix `posix.glob` function, except that it
+expands the resulting table so that it returns each match as a
+distinct value, ready to be used in e.g. `Shell.exec`.
+
 ### Cmd:exec(...)
 
 Execute the 'Cmd' with optional additional arguments. Returns a boolean

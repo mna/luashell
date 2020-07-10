@@ -509,4 +509,35 @@ function TestTest.testBadArgument()
   end)
 end
 
+TestGlob = {}
+function TestGlob.testCurrentDirMatches()
+  local a, b, c, d = sh.glob('shell*.lua')
+  lu.assertEquals(a, 'shell.lua')
+  lu.assertEquals(b, 'shell_bench.lua')
+  lu.assertEquals(c, 'shell_test.lua')
+  lu.assertNil(d)
+end
+
+function TestGlob.testCurrentDirNoMatch()
+  local a, b = sh.glob(NOSUCH .. '*')
+  lu.assertNil(a)
+  lu.assertNil(b)
+end
+
+function TestGlob.testOtherDirMatches()
+  local got = table.pack(sh.glob('lua_modules/*'))
+  lu.assertTrue(got.n == 4)
+end
+
+function TestGlob.testOtherDirNoMatches()
+  local got = sh.glob('lua_modules/' .. NOSUCH .. '*')
+  lu.assertNil(got)
+end
+
+function TestGlob.testInExec()
+  local p = sh.cmd('cat', sh.glob('shell*.lua')) | sh.cmd('wc', '-c')
+  local out = string.gsub(p:output(), '%s', '')
+  lu.assertTrue(tonumber(out) > 1000, out)
+end
+
 os.exit(lu.LuaUnit.run())

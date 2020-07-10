@@ -93,6 +93,14 @@ function Shell.var(t)
   end
 end
 
+-- This is the same as the luaposix glob function, except that it
+-- expands the resulting table so that it returns each match as a
+-- distinct value, ready to be used in e.g. Shell.exec.
+function Shell.glob(s)
+  local t = posix.glob(s)
+  if t then return table.unpack(t) end
+end
+
 -- Create a Cmd instance using the provided arguments. The first
 -- argument is the command name and the rest are the arguments bound
 -- to that Cmd.
