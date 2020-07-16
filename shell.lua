@@ -211,6 +211,8 @@ local function consume_pfd_output(pfd, target, mode)
   if not target then res = table.concat(out) end
   if res == '' and (status ~= 'exited' or code > 0) then
     res = nil
+  elseif res ~= '' then
+    res = string.gsub(res, '\n+$', '')
   end
   return res, status, code
 end
@@ -232,7 +234,7 @@ end
 -- This is the same as Cmd:exec except that it returns the stdout output as a string
 -- instead of the true/false boolean. The rest of the returned values are the same.
 -- If the command failed and no output was generated on stdout, it returns nil as output,
--- so that it can be used in an assert call.
+-- so that it can be used in an assert call. Trailing newlines are removed.
 function Cmd:output(...)
   local task = cmd_to_task(self, ...)
   local pfd = posix.popen(task, 'r')
@@ -253,6 +255,8 @@ end
 -- * a function, in which case it will be called with one argument, a string with each chunk
 --   of bytes from the output. It will be called a final time with nil to indicate the last
 --   call. The truncate argument is ignored in that case too.
+--
+-- Trailing newlines are not removed.
 --
 -- The rest of the arguments are extra arguments for the command, as for Cmd:exec and
 -- Cmd:output. It returns true or false as first argument, then the
@@ -284,7 +288,7 @@ end
 -- This is the same as Pipe:exec except that it returns the stdout output as a string
 -- instead of the true/false boolean. The rest of the returned values are the same.
 -- If the pipe failed and no output was generated on stdout, it returns nil as output,
--- so that it can be used in an assert call.
+-- so that it can be used in an assert call. Trailing newlines are removed.
 function Pipe:output(...)
   local tasks = pipe_to_tasks(self, ...)
   local pfd = posix.popen_pipeline(tasks, 'r')
@@ -305,6 +309,8 @@ end
 -- * a function, in which case it will be called with one argument, a string with each chunk
 --   of bytes from the output. It will be called a final time with nil to indicate the last
 --   call. The truncate argument is ignored in that case too.
+--
+-- Trailing newlines are not removed.
 --
 -- The rest of the arguments are extra arguments for the pipeline, as for Pipe:exec and
 -- Pipe:output. It returns true or false as first argument, then the

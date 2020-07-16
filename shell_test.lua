@@ -236,7 +236,7 @@ function TestCmd.testLongOutput()
 
   -- use diff to check if output is the same
   local tmpnm = os.tmpname()
-  local tmpf = io.open(tmpnm, "w+"); tmpf:write(out); tmpf:close()
+  local tmpf = io.open(tmpnm, "w+"); tmpf:write(out); tmpf:write('\n'); tmpf:close()
   lu.assertTrue(sh('diff', './shell_test.lua', tmpnm), tmpnm)
   os.remove(tmpnm)
 end
@@ -252,7 +252,7 @@ function TestCmd.testReuseCmd()
 
   local p = cmd | sh.cmd('wc', '-c')
   out = p:output()
-  lu.assertEquals(out, '4\n') -- cmd runs with 'abcd' only
+  lu.assertEquals(out, '4') -- cmd runs with 'abcd' only
 end
 
 function TestCmd.testRedirectFunction()
@@ -352,7 +352,7 @@ end
 function TestPipe.testOutput()
   local p = sh.cmd('echo', '-n', 'allo') | sh.cmd('wc', '-c')
   local out, status, code = p:output()
-  lu.assertEquals(out, '4\n')
+  lu.assertEquals(out, '4')
   lu.assertEquals(status, 'exited')
   lu.assertEquals(code, 0)
 end
@@ -360,7 +360,7 @@ end
 function TestPipe.testOutputDelayedLeft()
   local p = sh.cmd('./testdelayecho.sh', 2, 'allo') | sh.cmd('wc', '-c')
   local out, status, code = p:output()
-  lu.assertEquals(out, '4\n')
+  lu.assertEquals(out, '4')
   lu.assertEquals(status, 'exited')
   lu.assertEquals(code, 0)
 end
@@ -385,7 +385,7 @@ function TestPipe.testCombinePipeLeft()
   local p = sh.cmd('echo', '-n', 'allo12345678') | sh.cmd('wc', '-c') | sh.cmd('cat')
   local p2 = p | sh.cmd('wc', '-c')
   local out, status, code = p2:output()
-  lu.assertEquals(out, '3\n')
+  lu.assertEquals(out, '3')
   lu.assertEquals(status, 'exited')
   lu.assertEquals(code, 0)
 end
@@ -400,7 +400,7 @@ function TestPipe.testCombinePipeRight()
   local p = sh.cmd('wc', '-c') | sh.cmd('head', '-c1')
   local p2 = sh.cmd('echo', '-n', 'allo') | p | sh.cmd('wc', '-c')
   local out, status, code = p2:output()
-  lu.assertEquals(out, '1\n')
+  lu.assertEquals(out, '1')
   lu.assertEquals(status, 'exited')
   lu.assertEquals(code, 0)
 end
@@ -422,7 +422,7 @@ end
 function TestPipe.testOutputExtraArgs()
   local p = sh.cmd('echo', '-n') | sh.cmd('wc', '-c')
   local out, status, code = p:output('allo', 'you')
-  lu.assertEquals(out, '8\n')
+  lu.assertEquals(out, '8')
   lu.assertEquals(status, 'exited')
   lu.assertEquals(code, 0)
 end
