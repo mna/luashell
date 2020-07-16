@@ -69,7 +69,7 @@ number responsible for "killed" or "stopped".
 This is the same as `Cmd:exec` except that it returns the stdout output as a string
 instead of the true/false boolean. The rest of the returned values are the same.
 If the command failed and no output was generated on stdout, it returns nil as output,
-so that it can be used in an `assert` call.
+so that it can be used in an `assert` call. Trailing newlines are removed.
 
 ### Cmd:redirect(target, truncate, ...)
 
@@ -114,7 +114,7 @@ is no "set -o pipefail" mode, this is a bash-specific feature).
 This is the same as `Pipe:exec` except that it returns the stdout output as a string
 instead of the true/false boolean. The rest of the returned values are the same.
 If the pipe failed and no output was generated on stdout, it returns nil as output,
-so that it can be used in an `assert` call.
+so that it can be used in an `assert` call. Trailing newlines are removed.
 
 ### Pipe:redirect(target, truncate, ...)
 
