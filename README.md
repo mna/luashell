@@ -4,6 +4,9 @@ This is a small Lua module to help write what would be shell scripts in Lua. It 
 
 It has a single external dependency, [luaposix], and as such only works on POSIX systems. Otherwise it uses the `os`, `string` and `table` standard libraries.
 
+* Canonical repository: https://git.sr.ht/~mna/luashell
+* Issue tracker: https://todo.sr.ht/~mna/luashell
+
 ## Install
 
 Via Luarocks:
